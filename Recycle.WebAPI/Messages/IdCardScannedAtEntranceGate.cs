@@ -17,3 +17,9 @@ public record FractionWasSelected
     [JsonPropertyName("card_id")] public string CardId { get; set; }
     [JsonPropertyName("fraction_type")] public string FractionType { get; set; }
 }
+
+public static class FractionTypes
+{
+    public const string ConstructionWaste = "Construction waste";
+    public const string GreenWaste = "Green waste";
+}

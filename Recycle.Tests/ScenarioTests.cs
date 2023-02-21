@@ -63,9 +63,9 @@ public class ScenarioTests
             History = new List<Event>
             {
                 WeightWasMeasured(487),
-                FractionWasSelected("Construction waste"),
+                FractionWasSelected(FractionTypes.ConstructionWaste),
                 WeightWasMeasured(422),
-                FractionWasSelected("Green waste"),
+                FractionWasSelected(FractionTypes.GreenWaste),
                 WeightWasMeasured(375)
             }
         };

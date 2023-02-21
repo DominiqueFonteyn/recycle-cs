@@ -18,52 +18,52 @@ public class HandlingController
     [HttpPost]
     public Event Handle([FromBody] RecycleRequest request)
     {
-        logger.Log(LogLevel.Information,
-            "/handle-command request => " + JsonSerializer.Serialize(request, JsonSerializationConfiguration.Default));
-
-        var measuredEvents = request.History
-            .Where(x => x.Type == "WeightWasMeasured")
-            .OrderBy(x => x.CreatedAt)
-            .Cast<Event<WeightWasMeasured>>()
-            .Select(x => x.Payload)
-            .ToArray();
+        LogRequest(request);
 
         var runningPrice = 0d;
         var fractionPrice = 0d;
         var previousWeight = 0d;
-        var firstWeight = true;
+        var isFirstWeight = true;
         foreach (var evt in request.History)
-            if (evt.Type == nameof(WeightWasMeasured))
+            switch (evt.Type)
             {
-                var wwm = evt as Event<WeightWasMeasured>;
-                if (firstWeight)
+                case nameof(WeightWasMeasured):
                 {
-                    firstWeight = false;
-                }
-                else
-                {
-                    var weightMeasured = previousWeight - wwm.Payload.Weight;
-                    runningPrice += weightMeasured * fractionPrice;
-                }
+                    var wwm = evt as Event<WeightWasMeasured>;
+                    if (isFirstWeight)
+                    {
+                        isFirstWeight = false;
+                    }
+                    else
+                    {
+                        var weightMeasured = previousWeight - wwm.Payload.Weight;
+                        runningPrice += weightMeasured * fractionPrice;
+                    }
 
-                previousWeight = wwm.Payload.Weight;
-            }
-            else if (evt.Type == nameof(FractionWasSelected))
-            {
-                var fws = evt as Event<FractionWasSelected>;
-                fractionPrice = GetFractionPrice(fws);
+                    previousWeight = wwm.Payload.Weight;
+                    break;
+                }
+                case nameof(FractionWasSelected):
+                {
+                    var fws = evt as Event<FractionWasSelected>;
+                    fractionPrice = GetFractionPrice(fws);
+                    break;
+                }
             }
 
         var response = new Event<PriceWasCalculated>
         {
             EventId = Guid.NewGuid().ToString(),
             CreatedAt = DateTime.Now,
-            Payload = new PriceWasCalculated { CardId = "123", PriceAmount = runningPrice, PriceCurrency = "EUR" }
+            Payload = new PriceWasCalculated
+            {
+                CardId = "123",
+                PriceAmount = runningPrice,
+                PriceCurrency = "EUR"
+            }
         };
 
-        logger.Log(LogLevel.Information,
-            "/handle-command response => "
-            + JsonSerializer.Serialize(response, JsonSerializationConfiguration.Default));
+        LogResponse(response);
         return response;
     }
 
@@ -71,9 +71,22 @@ public class HandlingController
     {
         return fws.Payload.FractionType switch
         {
-            "Construction waste" => 0.15,
-            "Green waste" => 0.09,
+            FractionTypes.ConstructionWaste => 0.15,
+            FractionTypes.GreenWaste => 0.09,
             _ => 0
         };
+    }
+
+    private void LogRequest(RecycleRequest request)
+    {
+        logger.Log(LogLevel.Information,
+            "/handle-command request => " + JsonSerializer.Serialize(request, JsonSerializationConfiguration.Default));
+    }
+
+    private void LogResponse(Event<PriceWasCalculated> response)
+    {
+        logger.Log(LogLevel.Information,
+            "/handle-command response => "
+            + JsonSerializer.Serialize(response, JsonSerializationConfiguration.Default));
     }
 }
