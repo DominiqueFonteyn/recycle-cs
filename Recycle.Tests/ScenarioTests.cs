@@ -21,7 +21,10 @@ public class ScenarioTests
         var request = new RecycleRequest
         {
             Command = CalculatePrice(),
-            History = new List<Event>()
+            History = new List<Event>
+            {
+                IdCardRegistered("Moon Village")
+            }
         };
 
         var evt = _controller.Handle(request) as Event<PriceWasCalculated>;
@@ -37,6 +40,7 @@ public class ScenarioTests
             Command = CalculatePrice(),
             History = new List<Event>
             {
+                IdCardRegistered("Moon Village"),
                 WeightWasMeasured(487),
                 new Event<FractionWasSelected>
                 {
@@ -62,6 +66,7 @@ public class ScenarioTests
             Command = CalculatePrice(),
             History = new List<Event>
             {
+                IdCardRegistered("Moon Village"),
                 WeightWasMeasured(487),
                 FractionWasSelected(FractionTypes.ConstructionWaste),
                 WeightWasMeasured(422),
@@ -73,6 +78,26 @@ public class ScenarioTests
         var evt = _controller.Handle(request) as Event<PriceWasCalculated>;
 
         Assert.AreEqual(13.98, evt.Payload.PriceAmount);
+    }
+    
+    [Test]
+    public void HarryDelivers_200Kg_ConstructionWaste()
+    {
+        var request = new RecycleRequest
+        {
+            Command = CalculatePrice(),
+            History = new List<Event>
+            {
+                IdCardRegistered("Pineville"),
+                WeightWasMeasured(1280),
+                FractionWasSelected(FractionTypes.ConstructionWaste),
+                WeightWasMeasured(1080)
+            }
+        };
+
+        var evt = _controller.Handle(request) as Event<PriceWasCalculated>;
+
+        Assert.AreEqual(18, evt.Payload.PriceAmount);
     }
 
     private static Command<CalculatePrice> CalculatePrice()
@@ -104,6 +129,16 @@ public class ScenarioTests
             Payload = new FractionWasSelected
             {
                 FractionType = fractionType
+            }
+        };
+    }
+    private static Event<IdCardRegistered> IdCardRegistered(string city)
+    {
+        return new Event<IdCardRegistered>
+        {
+            Payload = new IdCardRegistered
+            {
+                City = city
             }
         };
     }

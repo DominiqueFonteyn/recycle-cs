@@ -20,36 +20,50 @@ public class HandlingController
     {
         LogRequest(request);
 
+        var idCardRegistered = request.History.Single(x => x.Type == nameof(IdCardRegistered)) as Event<IdCardRegistered>;
+        var city = idCardRegistered?.Payload.City;
+        
+        var weightPerFractionType = new Dictionary<string, double>();
         var runningPrice = 0d;
         var fractionPrice = 0d;
         var previousWeight = 0d;
         var isFirstWeight = true;
+        string fractionType = "";
         foreach (var evt in request.History)
             switch (evt.Type)
             {
                 case nameof(WeightWasMeasured):
-                {
-                    var wwm = evt as Event<WeightWasMeasured>;
-                    if (isFirstWeight)
                     {
-                        isFirstWeight = false;
-                    }
-                    else
-                    {
-                        var weightMeasured = previousWeight - wwm.Payload.Weight;
-                        runningPrice += weightMeasured * fractionPrice;
-                    }
+                        var wwm = evt as Event<WeightWasMeasured>;
+                        if (isFirstWeight)
+                        {
+                            isFirstWeight = false;
+                        }
+                        else
+                        {
+                            var weightMeasured = previousWeight - wwm.Payload.Weight;
+                            if (!weightPerFractionType.ContainsKey(fractionType)) 
+                                weightPerFractionType.Add(fractionType, 0);
+                            weightPerFractionType[fractionType] += weightMeasured;
+                            // runningPrice += weightMeasured * fractionPrice;
+                        }
 
-                    previousWeight = wwm.Payload.Weight;
-                    break;
-                }
+                        previousWeight = wwm.Payload.Weight;
+                        break;
+                    }
                 case nameof(FractionWasSelected):
-                {
-                    var fws = evt as Event<FractionWasSelected>;
-                    fractionPrice = GetFractionPrice(fws);
-                    break;
-                }
+                    {
+                        var fws = evt as Event<FractionWasSelected>;
+                        fractionType = fws.Payload.FractionType;
+                        // fractionPrice = GetFractionPrice(fws, city);
+                        break;
+                    }
             }
+        
+        //TODO: subtract exemptions from weightPerFactionType
+
+        double total = weightPerFractionType
+            .Sum(keyValuePair => keyValuePair.Value * GetFractionPrice(keyValuePair.Key, city));
 
         var response = new Event<PriceWasCalculated>
         {
@@ -58,7 +72,7 @@ public class HandlingController
             Payload = new PriceWasCalculated
             {
                 CardId = "123",
-                PriceAmount = runningPrice,
+                PriceAmount = total,
                 PriceCurrency = "EUR"
             }
         };
@@ -67,14 +81,27 @@ public class HandlingController
         return response;
     }
 
-    private static double GetFractionPrice(Event<FractionWasSelected> fws)
+    private static double GetFractionPrice(string fws, string? city)
     {
-        return fws.Payload.FractionType switch
+        var prices = new Dictionary<string, Dictionary<string, double>>
         {
-            FractionTypes.ConstructionWaste => 0.15,
-            FractionTypes.GreenWaste => 0.09,
-            _ => 0
+            {
+                "Pineville", new Dictionary<string, double>
+                {
+                    { FractionTypes.ConstructionWaste, 0.18d },
+                    { FractionTypes.GreenWaste, 0.12d }
+                }
+            },
+            {
+                "Moon Village", new Dictionary<string, double>
+                {
+                    { FractionTypes.ConstructionWaste, 0.15d },
+                    { FractionTypes.GreenWaste, 0.09d }
+                }
+            }
         };
+        
+        return prices[city][fws];
     }
 
     private void LogRequest(RecycleRequest request)
